@@ -1,0 +1,128 @@
+%% Gauss Seidal Load Flow
+ 
+clc;
+clear;
+close all;
+
+Base_MVA = 100;
+ 
+%Load line_data & bus_data
+line_data;  % | f_b | t_b | z_l | ysh/2 | a |
+bus_data;   % | b_no | b_type | |V| | Vangle | Sg | Sd | Qmin | Qmax |
+
+B = busdata;
+L = linedata;
+Nb = max(B(:,1));
+Ybus = YbusModification(L);
+alpha = 1;
+ 
+disp('Ybus');
+disp(Ybus);
+ 
+b_no = B(:,1); 
+bus_type = B(:,2); 
+V_mag = B(:,3); 
+V_ang = B(:,4); 
+PQg = B(:,5);
+PQd = B(:,6);
+Qmin = B(:,7);
+Qmax = B(:,8);
+ 
+V = ((V_mag).*exp(1j*V_ang))';
+
+iter = 0;
+tol = 10;
+
+while( tol >= 1e-5)
+    Vold = V;
+    iter = iter+1;
+ 
+    for i = 1 : Nb
+        if bus_type(i) == 1
+            % Generator Bus: Qi, V_ang
+            Qi = -imag(conj(V(i))*(sum(Ybus(i,:).*V)));
+ 
+            if (Qi > Qmin(i)) && (Qi < Qmax(i))
+                % Update Voltage phase angle
+                V_ang(i) = angle((conj(PQg(i)+1j*Qi)/conj(V(i)) - (sum(Ybus(i,:).*V)) + Ybus(i,i)*V(i))/Ybus(i,i));
+                V(i) = V_mag(i)*exp(1j*V_ang(i));
+ 
+            elseif Qi > Qmax(i)
+                % Upper Limit Violation, limit Qi to Qmax; Change bus type to 2
+                % Update both Voltage magnitude and phase angle
+                Qi = Qmax(i);
+                PQd(i) = real(PQg(i)) + 1j*Qmax(i);
+                bus_type(i) = 2;
+                V(i) = (conj(PQd(i))/conj(V(i)) - (sum(Ybus(i,:).*V)) + Ybus(i,i)*V(i))/Ybus(i,i);
+                V_mag(i) = abs(V(i));
+                V_ang(i) = angle(V(i));
+ 
+            elseif Qi < Qmin(i)
+                % Lower Limit Violation, limit Qi to Qmin; Change bus type to 2
+                % Update both Voltage magnitude and phase angle
+                Qi = Qmin(i);
+                PQd(i) = real(PQg(i)) + 1j*Qmin(i);
+                bus_type(i) = 2;
+                V(i) = (conj(PQd(i))/conj(V(i)) - (sum(Ybus(i,:).*V)) + Ybus(i,i)*V(i))/Ybus(i,i);
+                V_mag(i) = abs(V(i));
+                V_ang(i) = angle(V(i));
+            end
+        
+        elseif bus_type(i) == 2
+            % Load Bus: Vi, del(i)
+            V(i) = (conj(PQd(i))/conj(V(i)) - (sum(Ybus(i,:).*V)) + Ybus(i,i)*V(i))/Ybus(i,i);
+
+            V_mag(i) = abs(V(i));
+            V_ang(i) = angle(V(i));
+ 
+        end
+    end
+ 
+    delV = abs(V - Vold);
+    tol = max(delV);
+ 
+end
+ 
+ 
+%% Line flows & losses calculation
+ 
+V_mag = abs(V)
+del = angle(V)
+ 
+Y_mag = abs(Ybus);
+theta = angle(Ybus);
+ 
+ % Computation of Slack bus power
+ for i = 1: Nb
+    S(i) = conj(V(i))*sum(Ybus(i,:).*V);
+ end
+ 
+S = conj(S);
+ 
+ 
+% Computation of Line flows
+ for i= 1:Nb
+    for k= 1: Nb
+        if i ~= k
+            Pfl(i,k) = -(V_mag(i)^2)*Y_mag(i,k)*cos(theta(i,k)) + (Y_mag(i,k)*V_mag(i)*V_mag(k)*cos(theta(i,k)-del(i)+del(k)));
+            Qfl(i,k) = -(V_mag(i)^2)*Y_mag(i,k)*sin(theta(i,k)) - (Y_mag(i,k)*V_mag(i)*V_mag(k)*sin(theta(i,k)-del(i)+del(k)));
+        end
+    end
+ end
+ 
+
+% Computation of Losses
+ for i = 1:Nb
+    for k = i:Nb
+ 
+        P_Loss(i,k) = Pfl(i,k)+ Pfl(k,i);
+        Q_Loss(i,k) = Qfl(i,k)+ Qfl(k,i);
+                
+    end
+ end
+ 
+P_Loss = P_Loss*Base_MVA
+Q_Loss = Q_Loss*Base_MVA
+ 
+Total_P_Loss = sum(P_Loss(:))
+Total_Q_Loss = sum(Q_Loss(:))

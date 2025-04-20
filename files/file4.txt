@@ -1,0 +1,215 @@
+ %% Program for Newton-Raphson Load Flow Analysis
+clear all;
+clc;
+ 
+bus_info;
+line_info;
+ 
+Base_MVA = 100;          % Base MVA
+ 
+B = busdata;             % |Bus | Type | Vsp | theta | PGi | QGi | PLi | QLi |  Qmin | Qmax |
+ 
+L = linedata;            % |  From |  To   |   R     |   X     |     B/2  |  X'mer  |
+                         % |  Bus  | Bus   |  pu     |  pu     |     pu   | TAP (a) |
+ 
+Ybus = YbusModification(linedata)
+
+nb = max(B(:,1));
+bus = B(:,1);            % Bus Number
+type = B(:,2);           % Type of Bus 1-Slack, 2-PV, 3-PQ
+V = B(:,3);              % Specified Voltage
+delta = B(:,4);          % Voltage Angle
+Pg = B(:,5);             % PGi
+Qg = B(:,6);             % QGi
+Pd = B(:,7);             % PLi
+Qd = B(:,8);             % QLi
+Qmin = B(:,9);           % Minimum Reactive Power Limit
+Qmax = B(:,10);          % Maximum Reactive Power Limit
+Psp = Pg - Pd;           % Pi = PGi - PLi
+Qsp = Qg - Qd;           % Qi = QGi - QLi
+
+G = real(Ybus);             % Conductance matrix
+B = imag(Ybus);             % Susceptance matrix
+ 
+pv = find(type == 2 | type == 1);       % Gen. Buses
+pq = find(type == 3);                   % PQ Buses
+npv = length(pv);                       % No. of PV buses
+npq = length(pq);                       % No. of PQ buses
+ 
+Tol = 1;  
+Iter = 1;
+ 
+while (Tol > 1e-5)   
+    % Initialize P & Q with zero vector
+    P = zeros(nb,1);
+    Q = zeros(nb,1);
+    % Calculate P and Q
+    for i = 1:nb
+        for k = 1:nb
+            P(i) = P(i) + V(i)* V(k)*(G(i,k)*cos(delta(i)-delta(k)) + B(i,k)*sin(delta(i)-delta(k)));
+            Q(i) = Q(i) + V(i)* V(k)*(G(i,k)*sin(delta(i)-delta(k)) - B(i,k)*cos(delta(i)-delta(k)));
+        end
+    end
+ 
+    % Checking Q-limit violations
+        for n = 2:nb
+            if type(n) == 2
+                QG = Q(n);
+                if QG < Qmin(n)
+                    V(n) = V(n) + 0.01;
+                elseif QG > Qmax(n)
+                    V(n) = V(n) - 0.01;
+                end
+            end
+        end
+    
+    % Calculate change from specified value
+    dPa = Psp-P;
+    dQa = Qsp-Q;
+    k = 1;
+    dQ = zeros(npq,1);
+    for i = 1:nb
+        if type(i) == 3
+            dQ(k,1) = dQa(i);
+            k = k+1;
+        end
+    end
+    dP = dPa(2:nb);
+    M = [dP; dQ];       % Mismatch Vector
+    
+    % Jacobian formation
+    % J1 - Derivative of Real Power Injections with Angles
+    J1 = zeros(nb-1,nb-1);
+    for i = 1:(nb-1)
+        m = i+1;
+        for k = 1:(nb-1)
+            n = k+1;
+            if n == m
+                for n = 1:nb
+                    J1(i,k) = J1(i,k) + V(m)* V(n)*(-G(m,n)*sin(delta(m)-delta(n)) + B(m,n)*cos(delta(m)-delta(n)));
+                end
+                J1(i,k) = J1(i,k) - V(m)^2*B(m,m);
+            else
+                J1(i,k) = V(m)* V(n)*(G(m,n)*sin(delta(m)-delta(n)) - B(m,n)*cos(delta(m)-delta(n)));
+            end
+        end
+    end
+    
+    % J2 - Derivative of Real Power Injections with V
+    J2 = zeros(nb-1,npq);
+    for i = 1:(nb-1)
+        m = i+1;
+        for k = 1:npq
+            n = pq(k);
+            if n == m
+                for n = 1:nb
+                    J2(i,k) = J2(i,k) + V(n)*(G(m,n)*cos(delta(m)-delta(n)) + B(m,n)*sin(delta(m)-delta(n)));
+                end
+                J2(i,k) = J2(i,k) + V(m)*G(m,m);
+            else
+                J2(i,k) = V(m)*(G(m,n)*cos(delta(m)-delta(n)) + B(m,n)*sin(delta(m) - delta(n)));
+            end
+        end
+    end
+    
+    % J3 - Derivative of Reactive Power Injections with Angles
+    J3 = zeros(npq,nb-1);
+    for i = 1:npq
+        m = pq(i);
+        for k = 1:(nb-1)
+            n = k+1;
+            if n == m
+                for n = 1:nb
+                    J3(i,k) = J3(i,k) + V(m)* V(n)*(G(m,n)*cos(delta(m)-delta(n)) + B(m,n)*sin(delta(m)-delta(n)));
+                end
+                J3(i,k) = J3(i,k) - V(m)^2*G(m,m);
+            else
+                J3(i,k) = V(m)* V(n)*(-G(m,n)*cos(delta(m)-delta(n)) - B(m,n)*sin(delta(m)-delta(n)));
+            end
+        end
+    end
+    
+    % J4 - Derivative of Reactive Power Injections with V
+    J4 = zeros(npq,npq);
+    for i = 1:npq
+        m = pq(i);
+        for k = 1:npq
+            n = pq(k);
+            if n == m
+                for n = 1:nb
+                    J4(i,k) = J4(i,k) + V(n)*(G(m,n)*sin(delta(m)-delta(n)) - B(m,n)*cos(delta(m)-delta(n)));
+                end
+                J4(i,k) = J4(i,k) - V(m)*B(m,m);
+            else
+                J4(i,k) = V(m)*(G(m,n)*sin(delta(m)-delta(n)) - B(m,n)*cos(delta(m) - delta(n)));
+            end
+        end
+    end
+    
+    J = [J1 J2; J3 J4];     % Jacobian Matrix
+    
+    X = inv(J)*M;         % Correction Vector
+    dTh = X(1:nb-1);      % Change in Voltage Angle
+    dV = X(nb:end);       % Change in Voltage Magnitude
+    
+    % Updating State Vectors
+    delta(2:nb) = dTh + delta(2:nb);    % Voltage Angle
+    k = 1;
+    for i = 2:nb
+        if type(i) == 3
+            V(i) = dV(k) + V(i);        % Voltage Magnitude
+            k = k+1;
+        end
+    end
+    
+    Iter = Iter + 1;
+    Tol = max(abs(M));                  % Tolerance
+    
+end
+ 
+%% Line flows & losses calculation
+ 
+V_mag = V';
+ del = delta';
+ V1 = V_mag.*exp(1i*del);
+ 
+Y_mag = abs(Ybus);
+ theta = angle(Ybus);
+ 
+% Computation of (Slack) Bus Power
+ for i = 1:nb
+    S(i) = conj(V1(i))*sum(Ybus(i,:).*V1);
+ end
+ 
+S = conj(S);
+ 
+% Computation of Line Flows
+ 
+for i = 1:nb
+    for k = 1:nb
+ 
+        if i ~= k
+            
+            Pfl(i,k) = -(V_mag(i)^2)*Y_mag(i,k)*cos(theta(i,k)) + (Y_mag(i,k)*V_mag(i)*V_mag(k)*cos(theta(i,k)-del(i)+del(k)));
+            
+            Qfl(i,k) = (V_mag(i)^2)*Y_mag(i,k)*sin(theta(i,k)) - (Y_mag(i,k)*V_mag(i)*V_mag(k)*sin(theta(i,k)-del(i)+del(k)));
+            
+        end
+    end
+ end
+ 
+% Computation of Losses
+ for i = 1:nb
+    for k = i:nb
+ 
+        P_Loss(i,k) = Pfl(i,k)+ Pfl(k,i);
+        Q_Loss(i,k) = Qfl(i,k)+ Qfl(k,i);
+                
+    end
+ end
+ 
+P_Loss = P_Loss*Base_MVA
+Q_Loss = Q_Loss*Base_MVA
+ 
+Total_P_Loss = sum(P_Loss(:))
+Total_Q_Loss = sum(Q_Loss(:))

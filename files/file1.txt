@@ -1,0 +1,505 @@
+%% Program for tr.line parameters L & C calculation 
+
+clc           
+clear;     
+close all;      
+
+no_phases   =   input('number of phase conductors in tr. line 1- single phase 3 - three phase: ');
+fn          =   input('operating nominal frequency (assume 50 Hz if not provided) in Hertz: ');
+u0          =   4*pi*1e-7;      
+e0          =   8.8542*1e-12;   
+r           =   input('radius of each conductor in centimeter r: ');
+r1          =   0.7788*r;       % Effective radius
+l           =   input('length of tr. line (assume per km if not provided) in km l: ');
+
+if no_phases == 1
+    D       =   input('surface distance between conductors in meters D: ');
+    
+    Lc      =   (u0/(2*pi))*1e6*log((D+2*r*1e-2)/(r1*1e-2));      
+    Cc      =   (2*pi*e0)*1e9/log((D+2*r*1e-2)/(r*1e-2));              
+
+    disp_type   =   1;
+
+else
+    % three phase config.
+
+    circuit     =   input('conductor circuit type 1-single circuit 2-double circuit 3-bundled cond: ');
+    symm        =   input('whether conductors arrangement is symmetrical 1-YES 0-unsymm.: ');
+    transp      =   input('whether tr.line conductors transposed 1-YES 0-untransposed: ');
+
+    if symm == 1
+        D       =   input('surface distance between any two conductors in meters D: ');
+
+        if circuit == 1
+            % three phase symmetrical single circuit tr. line config.
+            
+            Lc      =   (u0/(2*pi))*1e6*log((D+2*r*1e-2)/(r1*1e-2));        
+            Cc      =   (2*pi*e0)*1e9/log((D+2*r*1e-2)/(r*1e-2));          
+
+            disp_type   =   1;
+
+        elseif circuit == 2
+            % three phase symmetrical double circuit tr. line
+
+            Lc      =   (u0/(2*pi))*1e6*log(sqrt(3)*(D+2*r*1e-2)/(2*r1*1e-2));         
+            Cc      =   (2*pi*e0)*1e9/log(sqrt(3)*(D+2*r*1e-2)/(2*r*1e-2));            
+
+            disp_type   =   1;
+
+        else
+            disp('There is error in data entry/wrong data entry');
+
+        end
+
+
+    elseif transp == 1
+        D_ab    =   input('enter distance between centers of phase conductors a & b: ');
+        D_bc    =   input('enter distance between centers of phase conductors b & c: ');
+        D_ca    =   input('enter distance between centers of phase conductors c & a: ');
+
+        if circuit == 1
+            % three phase unsymmetrical single circuit transposed tr. line
+            D_eq    =   (D_ab*D_bc*D_ca)^(1/3);
+
+            Lc      =   (u0/(2*pi))*1e6*log(D_eq/(r1*1e-2));       
+            Cc      =   (2*pi*e0)*1e9/log(D_eq/(r*1e-2));           
+
+            disp_type   =   1;
+
+        elseif circuit == 2
+            % three phase unsymmetrical double circuit transposed tr. line
+            % [a-b-c] and [A-B-C] represents phase sequences of double circuit tr. line
+
+            D_aB    =   input('enter distance between centers of phase conductors a & B: ');
+            D_bC    =   input('enter distance between centers of phase conductors b & C: ');
+            D_cA    =   input('enter distance between centers of phase conductors c & A: ');
+
+            D_aA    =   input('enter distance between centers of phase conductors a & A: ');
+            D_bB    =   input('enter distance between centers of phase conductors b & B: ');
+            D_cC    =   input('enter distance between centers of phase conductors c & C: ');
+
+            Self_GMD    =   (D_aA*D_bB*D_cC*(r1*1e-2)^3)^(1/6);
+
+            Mutual_GMD  =   (D_ab*D_bc*D_ca*D_aB*D_bC*D_cA)^(1/6);
+
+            Lc      =   (u0/(2*pi))*1e6*log(Mutual_GMD/Self_GMD);       
+            Cc      =   (2*pi*e0)*1e9/log(Mutual_GMD/(r*1e-2));       
+
+            disp_type   =   1;
+
+        else
+            disp('There is error in data entry/wrong data entry');
+
+        end
+
+
+    elseif circuit == 3
+        % bundled conductor tr. line config. by assuming transposed lines
+        r = r * 1e-2; 
+        D_aA    =   input('enter distance between centers of phase conductors A & A'': ');
+        D_Aa    =   input('enter distance between centers of phase conductors A'' & A: 0');
+        Ds      =   (0.7788 * r * 0.7788 * r * D_aA * D_Aa) ^ (1 / 4); 
+
+        D_AB = input('Distance between A and B: ');  
+        D_Ab = input('Distance between A and B'': ');  
+        D_aB = input('Distance between A'' and B: ');  
+        D_ab = input('Distance between A'' and B'': ');  
+        D_mAB = ((D_AB + 2 * r) * (D_Ab + 2 * r) * (D_aB + 2 * r) * (D_ab + 2 * r)) ^ (1 /  4); 
+
+        D_BC = input('Distance between B and C: ');  
+        D_Bc = input('Distance between B and C'': ');  
+        D_bC = input('Distance between B'' and C: ');  
+        D_bc = input('Distance between B'' and C'': ');  
+        D_mBC = ((D_BC + 2 * r) * (D_Bc + 2 * r) * (D_bC + 2 * r) * (D_bc + 2 * r)) ^ (1 /  4); 
+
+        D_CA = input('Distance between C and A: ');  
+        D_Ca = input('Distance between C and A'': ');  
+        D_cA = input('Distance between C'' and A: ');  
+        D_ca = input('Distance between C'' and A'': ');  
+        D_mCA = ((D_CA + 2 * r) * (D_Ca + 2 * r) * (D_cA + 2 * r) * (D_ca + 2 * r)) ^ (1 /  4); 
+        
+        Dm = (D_mAB * D_mBC * D_mCA) ^ (1 / 3);  
+        Lc = (u0 / (2 * pi)) * 1e6 * log(Dm / Ds);  
+
+        Dsc = (r * r * D_aA * D_Aa) ^ (1 / 4);
+        Cc = (2 * pi * e0) *1e9 / log(Dm / Dsc);
+        disp_type = 1;
+
+    else
+        % untransposed unsymmetrical 3-phase tr. line
+        % Input distances between conductors
+        r = r * 1e-2;
+        Dab = input('Enter distance between A and B (Dab): ');
+        Dbc = input('Enter distance between B and C (Dbc): ');
+        Dca = input('Enter distance between C and A (Dca): ');
+        
+        % Inductance calculations
+        La = 2e-7 * (log(sqrt(Dab * Dca) / (0.7788 * r)) + 1j * sqrt(3) * log(sqrt(Dab / Dca)));
+        Lb = 2e-7 * (log(sqrt(Dbc * Dab) / (0.7788 * r)) + 1j * sqrt(3) * log(sqrt(Dbc / Dab)));
+        Lc = 2e-7 * (log(sqrt(Dca * Dbc) / (0.7788 * r)) + 1j * sqrt(3) * log(sqrt(Dca / Dbc)));
+        
+        % Capacitance calculations
+        CA_num = 2 * pi * e0 * (log(Dbc / r) + (0.5 + 1j * 0.87) * log(Dca / Dab));
+        CA_den = log(Dca / r) * log(Dbc / r) - log(Dbc / Dab) * log(Dca / Dab);
+        CA = CA_num / CA_den;
+        
+        CB_num = 2 * pi * e0 * (log(Dca / r) + (0.5 + 1j * 0.87) * log(Dab / Dbc));
+        CB_den = log(Dab / r) * log(Dca / r) - log(Dca / Dbc) * log(Dab / Dbc);
+        CB = CB_num / CB_den;
+        
+        CC_num = 2 * pi * e0 * (log(Dab / r) + (0.5 + 1j * 0.87) * log(Dbc / Dca));
+        CC_den = log(Dbc / r) * log(Dab / r) - log(Dab / Dca) * log(Dbc / Dca);
+        CC = CC_num / CC_den;
+
+        La = La * 1e6;
+        Lb = Lb * 1e6;
+        Lc = Lc * 1e6;
+
+        CA = CA * 1e9;
+        CB = CB * 1e9;
+        CC = CC * 1e9;
+
+        disp_type   =   2;
+
+    end
+
+            
+end
+
+
+if disp_type == 1
+    X_l     =   2*pi*fn*Lc*l*1e-3;   
+    Y_c     =   2*pi*fn*Cc*l*1e-6;      
+    
+    disp(['Series inductance of conductor in mH/km Lc: ',num2str(Lc)])
+    disp(['Inductive reactance of conductor in ohms X_l: ',num2str(X_l)])
+    disp(['Shunt capacitance of conductor in uF/km Cc: ',num2str(Cc)])
+    disp(['Capacitive admittance of conductor in siemens Y_c: ',num2str(Y_c)])
+
+else
+    disp('Inductance:');
+    disp(['La: ', num2str(La), ' mH/km']);
+    disp(['Lb: ', num2str(Lb), ' mH/km']);
+    disp(['Lc: ', num2str(Lc), ' mH/km']);
+    
+    disp('Capacitance:');
+    disp(['CA: ', num2str(CA), ' uF/km']);
+    disp(['CB: ', num2str(CB), ' uF/km']);
+    disp(['CC: ', num2str(CC), ' uF/km']);
+
+end
+
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+
+%% Program for finding tr. line performance from Reg & Efficiency as performance index
+
+clc; 
+clear; 
+close all; 
+
+line_con = input('Type of tr.line  enter 1 for short,2 for medium,3 for long: '); 
+P_load=input('Enter receiving end power in MW: '); 
+V_r=input('Enter receiving end phase voltage in KV: '); 
+pf_r=input('Enter receiving end power factor: '); 
+
+if line_con==1 
+ 
+    L=input('Enter length of transmission line in km: '); 
+    R_l=input('Enter resistance of tr.line per phase in ohms per km: '); 
+    X_l=input('Enter reactance of tr.line per phase in ohms per km: '); 
+    R_l=R_l*L; A
+    X_l=X_l*L; 
+    Z_l=R_l+1i*X_l; 
+    A=1; 
+    D=1; 
+    C=0; 
+    B=Z_l; 
+    Pload=P_load*10^6; 
+    Vrec=V_r*10^3; 
+    Irec=(Pload*exp(-1i*acos(pf_r))/(3*Vrec*pf_r)); 
+    Vsen=(A*Vrec)+(B*Irec); 
+    Isen=(C*Vrec)+(D*Irec); 
+    send_pf=cos(angle(Vsen)-angle(Isen)); 
+    Ps=3*abs(Vsen)*abs(Isen)*send_pf; 
+    Qs=3*abs(Vsen)*abs(Isen)*sin(acos(send_pf)); 
+    Reg_per=((abs(Vsen)-abs(Vrec))/abs(Vrec))*100; 
+    Effi_per=(Pload/Ps)*100; 
+    disp('Parameter A: '); 
+    disp(A); 
+    disp('Parameter B: '); 
+    disp(B); 
+    disp('Parameter C: '); 
+    disp(C); 
+    disp('Parameter D: '); 
+    disp(D); 
+    disp('Sending end power factor: '); 
+    disp(send_pf); 
+    disp('Sending end active power MW: '); 
+    disp(abs(Ps)*10^(-6)); 
+    disp('sending end reactive power in MVAR: '); 
+    disp(abs(Qs)*10^(-6)); 
+    disp('Percentage of voltage regulation is: '); 
+    disp(abs(Reg_per)); 
+    disp('Percentage of efficiency is: '); 
+    disp(abs(Effi_per)); 
+ 
+    % Medium transmission line 
+elseif line_con==2 
+    method=input('Enter 1 for Nominal T-Method,2 for Nominal π-Method: '); 
+    % Medium transmission line-Nominal T method 
+    if method==1 
+        L=input('Enter length of transmission line in km: '); 
+        R_l=input('Enter resistance of tr.line per phase in ohms per km: '); 
+        X_l=input('Enter reactance of tr.line per phase in ohms per km: '); 
+        y_l=input('Enter admittance of tr.line per phase in mho per km: '); 
+        R_l=R_l*L; 
+        X_l=X_l*L; 
+        y_l=y_l*L; 
+        Z_l=R_l+1i*X_l; 
+        Y_l=1i*y_l; 
+        A=1+(Y_l*Z_l)/2; 
+        B=Z_l*(1+(Y_l*Z_l)/4); 
+        C=Y_l; 
+        D=1+(Y_l*Z_l)/2; 
+ 
+        Pload=P_load*10^6; 
+        Vrec=V_r*10^3; 
+        Irec=(Pload*exp(-1i*acos(pf_r))/(3*Vrec*pf_r)); 
+        Vsen=(A*Vrec)+(B*Irec); 
+        Isen=(C*Vrec)+(D*Irec); 
+        send_pf=cos(angle(Vsen)-angle(Isen)); 
+        Ps=3*abs(Vsen)*abs(Isen)*send_pf; 
+        Qs=3*abs(Vsen)*abs(Isen)*sin(acos(send_pf)); 
+        Reg_per=((abs(Vsen)-abs(Vrec))/abs(Vrec))*100; 
+        Effi_per=(Pload/Ps)*100; 
+        disp('Parameter A: '); 
+        disp(A); 
+        disp('Parameter B: '); 
+        disp(B); 
+        disp('Parameter C: '); 
+        disp(C); 
+        disp('Parameter D: '); 
+        disp(D); 
+        disp('Sending end power factor: '); 
+        disp(send_pf); 
+        disp('Sending end active power MW: '); 
+        disp(abs(Ps)*10^(-6)); 
+        disp('sending end reactive power in MVAR: '); 
+        disp(abs(Qs)*10^(-6)); 
+        disp('Percentage of voltage regulation is: '); 
+        disp(abs(Reg_per)); 
+        disp('Percentage of efficiency is: '); 
+        disp(abs(Effi_per)); 
+ 
+      % Medium transmission line-Nominal π method 
+ 
+    elseif method==2 
+        L=input('Enter length of transmission line in km: '); 
+        R_l=input('Enter resistance of tr.line per phase in ohms per km: '); 
+        X_l=input('Enter reactance of tr.line per phase in ohms per km: '); 
+        y_l=input('Enter admittance of tr.line per phase in mho per km: '); 
+        R_l=R_l*L; 
+        X_l=X_l*L; 
+        y_l=y_l*L; 
+        Z_l=R_l+1i*X_l; 
+        Y_l=1i*y_l; 
+        A=1+(Y_l*Z_l)/2; 
+        B=Z_l; 
+        C=Y_l*(1+(Y_l*Z_l)/4); 
+        D=1+(Y_l*Z_l)/2; 
+         
+        Pload=P_load*10^6; 
+        Vrec=V_r*10^3; 
+        Irec=(Pload*exp(-1i*acos(pf_r))/(3*Vrec*pf_r)); 
+        Vsen=(A*Vrec)+(B*Irec); 
+        Isen=(C*Vrec)+(D*Irec); 
+        send_pf=cos(angle(Vsen)-angle(Isen)); 
+        Ps=3*abs(Vsen)*abs(Isen)*send_pf; 
+        Qs=3*abs(Vsen)*abs(Isen)*sin(acos(send_pf)); 
+        Reg_per=((abs(Vsen)-abs(Vrec))/abs(Vrec))*100; 
+        Effi_per=(Pload/Ps)*100; 
+        disp('Parameter A: '); 
+        disp(A); 
+        disp('Parameter B: '); 
+        disp(B); 
+        disp('Parameter C: '); 
+        disp(C); 
+        disp('Parameter D: '); 
+        disp(D); 
+        disp('Sending end power factor: '); 
+        disp(send_pf); 
+        disp('Sending end active power MW: '); 
+        disp(abs(Ps)*10^(-6)); 
+        disp('sending end reactive power in MVAR: '); 
+        disp(abs(Qs)*10^(-6)); 
+        disp('Percentage of voltage regulation is: '); 
+        disp(abs(Reg_per)); 
+        disp('Percentage of efficiency is: '); 
+        disp(abs(Effi_per)); 
+    else 
+        disp('There is error in data entry/wrong data entry'); 
+ 
+    end 
+ 
+ 
+ 
+ 
+% Long transmission line 
+elseif line_con==3 
+    % Long transmission line Rigorous Method 
+    method=input('Enter 1 for Rigorous Method,2 for Equivalent π-Method,3 for Equivalent T Method: '); 
+    if method==1 
+        f=input('Enter the frequency: '); 
+        L=input('Enter length of transmission line in km: '); 
+        R_l=input('Enter resistance of tr.line per phase in ohms per km: '); 
+        X_l=input('Enter inductance of tr.line per phase in henry per km: '); 
+        y_l=input('Enter capacitance of tr.line per phase in faraday per km: '); 
+        R_l=R_l*L; 
+        X_l=X_l*L*2*pi*f; 
+        y_l=y_l*L*2*pi*f; 
+        Z_l=R_l+1i*X_l; 
+        Y_l=1i*y_l; 
+        Gal=(Z_l*Y_l)^(1/2); 
+        Zc=(Z_l/Y_l)^(1/2); 
+        A=cosh(Gal);   
+        B=Zc*sinh(Gal); 
+        C=1/Zc*sinh(Gal); 
+        D=cosh(Gal); 
+ 
+        Pload=P_load*10^6; 
+        Vrec=V_r*10^3; 
+        Irec=(Pload*exp(-1i*acos(pf_r))/(3*Vrec*pf_r)); 
+        Vsen=(A*Vrec)+(B*Irec); 
+        Isen=(C*Vrec)+(D*Irec); 
+        send_pf=cos(angle(Vsen)-angle(Isen)); 
+        Ps=3*abs(Vsen)*abs(Isen)*send_pf; 
+        Qs=3*abs(Vsen)*abs(Isen)*sin(acos(send_pf)); 
+        Reg_per=((abs(Vsen)-abs(Vrec))/abs(Vrec))*100; 
+        Effi_per=(Pload/Ps)*100; 
+        disp('Parameter A: '); 
+        disp(A); 
+        disp('Parameter B: '); 
+        disp(B); 
+        disp('Parameter C: '); 
+        disp(C); 
+        disp('Parameter D: '); 
+        disp(D); 
+        disp('Sending end power factor: '); 
+        disp(send_pf); 
+        disp('Sending end active power MW: '); 
+        disp(abs(Ps)*10^(-6)); 
+        disp('sending end reactive power in MVAR: '); 
+        disp(abs(Qs)*10^(-6)); 
+        disp('Percentage of voltage regulation is: '); 
+        disp(abs(Reg_per)); 
+        disp('Percentage of efficiency is: '); 
+        disp(abs(Effi_per)); 
+ 
+        % long transmission line Equivalent π Method 
+ 
+    elseif method==2 
+        f=input('Enter the frequency: '); 
+        L=input('Enter length of transmission line in km: '); 
+        R_l=input('Enter resistance of tr.line per phase in ohms per km: '); 
+        X_l=input('Enter inductance of tr.line per phase in henry per km: '); 
+        y_l=input('Enter capacitance of tr.line per phase in faraday per km: '); 
+        R_l=R_l*L; 
+        X_l=X_l*L*2*pi*f; 
+        y_l=y_l*L*2*pi*f; 
+        Z_l=R_l+1i*X_l; 
+        Y_l=exp(1i*1.57078)*y_l; 
+        Gal=(Z_l*Y_l)^(1/2); 
+        Zc=(Z_l/Y_l)^(1/2); 
+        Y_l=(Y_l)*(tanh((Gal)/2)/(Gal/2)); 
+        Z_l=Z_l*((sinh(Gal))/(Gal)); 
+        A=1+(Y_l*Z_l)/2;   
+        B=Z_l; 
+        C=Y_l*(1+(Y_l*Z_l)/4); 
+        D=1+(Y_l*Z_l)/2;  
+ 
+        Pload=P_load*10^6; 
+        Vrec=V_r*10^3; 
+        Irec=(Pload*exp(-1i*acos(pf_r))/(3*Vrec*pf_r)); 
+        Vsen=(A*Vrec)+(B*Irec); 
+        Isen=(C*Vrec)+(D*Irec); 
+        send_pf=cos(angle(Vsen)-angle(Isen)); 
+        Ps=3*abs(Vsen)*abs(Isen)*send_pf; 
+        Qs=3*abs(Vsen)*abs(Isen)*sin(acos(send_pf)); 
+        Reg_per=((abs(Vsen)-abs(Vrec))/abs(Vrec))*100; 
+        Effi_per=(Pload/Ps)*100; 
+        disp('Parameter A: '); 
+        disp(A); 
+        disp('Parameter B: '); 
+        disp(B); 
+        disp('Parameter C: '); 
+        disp(C); 
+        disp('Parameter D: '); 
+        disp(D); 
+        disp('Sending end power factor: '); 
+        disp(send_pf); 
+        disp('Sending end active power MW: '); 
+        disp(abs(Ps)*10^(-6)); 
+        disp('sending end reactive power in MVAR: '); 
+        disp(abs(Qs)*10^(-6)); 
+        disp('Percentage of voltage regulation is: '); 
+        disp(abs(Reg_per)); 
+        disp('Percentage of efficiency is: '); 
+        disp(abs(Effi_per)); 
+ 
+        % long transmission line Equivalent T Method 
+        
+    elseif method==3 
+        f=input('Enter the frequency: '); 
+        L=input('Enter length of transmission line in km: '); 
+        R_l=input('Enter resistance of tr.line per phase in ohms per km: '); 
+        X_l=input('Enter inductance of tr.line per phase in henry per km: '); 
+        y_l=input('Enter capacitance of tr.line per phase in faraday per km: '); 
+        R_l=R_l*L; 
+        X_l=X_l*L*2*pi*f; 
+        y_l=y_l*L*2*pi*f; 
+        Z_l=R_l+1i*X_l; 
+        Y_l=1i*y_l; 
+        Gal=(Z_l*Y_l)^(1/2); 
+        Zc=(Z_l/Y_l)^(1/2); 
+        Zeq=Z_l*(tanh((Gal)/2)/((Gal)/2)); 
+        Yeq=Y_l*(sinh(Gal)/(Gal)); 
+        A=1+(Yeq*Zeq)/2;   
+        B=Z_l; 
+        C=Yeq*(1+(Yeq*Zeq)/4); 
+        D=1+(Yeq*Zeq)/2;  
+ 
+        Pload=P_load*10^6; 
+        Vrec=V_r*10^3; 
+        Irec=(Pload*exp(-1i*acos(pf_r))/(3*Vrec*pf_r)); 
+        Vsen=(A*Vrec)+(B*Irec); 
+        Isen=(C*Vrec)+(D*Irec); 
+        send_pf=cos(angle(Vsen)-angle(Isen)); 
+        Ps=3*abs(Vsen)*abs(Isen)*send_pf; 
+        Qs=3*abs(Vsen)*abs(Isen)*sin(acos(send_pf)); 
+        Reg_per=((abs(Vsen)-abs(Vrec))/abs(Vrec))*100; 
+        Effi_per=(Pload/Ps)*100; 
+        disp('Parameter A: '); 
+        disp(A); 
+        disp('Parameter B: '); 
+        disp(B); 
+        disp('Parameter C: '); 
+        disp(C); 
+        disp('Parameter D: '); 
+        disp(D); 
+        disp('Sending end power factor: '); 
+        disp(send_pf); 
+        disp('Sending end active power MW: '); 
+        disp(abs(Ps)*10^(-6)); 
+        disp('sending end reactive power in MVAR: '); 
+        disp(abs(Qs)*10^(-6)); 
+        disp('Percentage of voltage regulation is: '); 
+        disp(abs(Reg_per)); 
+        disp('Percentage of efficiency is: '); 
+        disp(abs(Effi_per)); 
+    else 
+        disp('There is error in data entry/wrong data entry'); 
+    end 
+    else 
+        disp('There is error in data entry/wrong data entry'); 
+end

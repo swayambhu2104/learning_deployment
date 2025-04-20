@@ -1,0 +1,39 @@
+
+%% Input Data
+len = 100;
+z1 = 0.01537 + (100*pi*i*0.8858e-3);  % per kM impedance of first line section
+z2 = 0.01537 + (100*pi*i*0.8858e-3);  % per kM impedance of second line section
+z0 = 0.04612 + (100*pi*i*2.6547e-3);  % per kM 
+
+k = (z0-z1)/z1;
+
+Z1 = z1*len;
+Z2 = z2*len;
+Z0 = z0*len;
+
+Z11 = 0.8*Z1;         % Zone 1 setting = 0.8*Z1
+Z12 = Z1 + 0.3*Z2;    % Zone 2 = 0.2*Z1 + 0.5*Z2
+Z13 = Z1 + Z2;
+z11 = abs(Z11);
+z12 = abs(Z12);
+z13 = abs(Z13);
+
+%% R-X planes and zones for Relay-1
+
+ang = 0:0.01:2*pi;
+del_0 = angle(Z11);
+
+plot((z11/2)*(cos(del_0)+cos(ang)), (z11/2)*(sin(del_0)+sin(ang)), 'r');
+hold ON;
+plot((z12/2)*(cos(del_0)+cos(ang)), (z12/2)*(sin(del_0)+sin(ang)), 'g');
+hold ON;
+plot((z13/2)*(cos(del_0)+cos(ang)), (z13/2)*(sin(del_0)+sin(ang)), 'b');
+hold ON;
+
+%% R-X trajectory
+
+r = R(5001:end,:);
+x = X(5001:end,:);
+
+plot(r, x);
+hold ON;

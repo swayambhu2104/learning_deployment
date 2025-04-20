@@ -1,0 +1,137 @@
+%% Program for finding Bus Admittance Matrix: Inspection method....
+% Input line data: from_bus  to_bus  line_R  line_X  shunt_B/2;
+clc                
+clear all;         
+close all;         
+
+line_data;
+gen_data;
+
+fb = linedata(:,1);                 % From bus number...
+tb = linedata(:,2);                 % To bus number...
+r = linedata(:,3);                  % Resistance, R...
+x = linedata(:,4);                  % Reactance, X...
+b = linedata(:,5);                  % Shunt susceptance, B/2...
+% a = linedata(:,6);             % Tap setting value..
+z = r + i*x;                            % line self impedance matrix...
+y = 1./z;                                 % line self admittance matrix...
+y_sh = i*b;                           % Shunt admittance Y_sh = j B/2...
+
+nb = max(max(fb),max(tb));          % No. of buses...
+nl = length(fb);                                % No. of lines/branches...
+Y = zeros(nb,nb);                            % Initialise YBus with zero matrix...
+ 
+ % Formation of the Off Diagonal Elements...
+ for k = 1:nl
+     % Y(fb(k),tb(k)) = Y(fb(k),tb(k)) - y(k)/a(k);
+     Y(fb(k),tb(k)) = Y(fb(k),tb(k)) - y(k);
+     Y(tb(k),fb(k)) = Y(fb(k),tb(k));
+ end
+ 
+ % Formation of Diagonal Elements....
+ for m = 1:nb
+     % select bus number for diagonal element
+     for n = 1:nl
+         % select lines one by one
+         if fb(n) == m || tb(n) == m
+             % check whether the bus associated with line 'n'
+             % Y(m,m) = Y(m,m) + y(n)/(a(n)^2) + b(n);
+             Y(m,m) = Y(m,m) + y(n) + y_sh(n);
+         % elseif tb(n) == m
+         %     Y(m,m) = Y(m,m) + y(n) + b(n);
+         end
+     end
+ end
+ 
+Y_nogen     =   Y;      % Bus admittance matrix without considering generator sub-transient/transient reactance
+
+ for m = 1:length(gendata(:,1))
+     gen_bus = gendata(m,1);
+     Y(gen_bus,gen_bus) =  Y(gen_bus,gen_bus) + 1/(i*gendata(m,3));
+ end
+
+ disp('Bus Admittance Matrix Y_bus:')
+ disp(Y)
+
+ %%
+ % Program for finding Bus Impedance Matrix: Z_bus Building Algorithm....
+
+N   =   input('total number of nodes(inclusing reference node), N:');
+L   =   input('total number of lines/branches in the network, L:');
+
+no_twig      =   N-1;              
+no_Link     =   L - N + 1;     
+
+Z_bus       =   zeros(no_twig,no_twig);    
+
+% Z_bus modification for tree branches
+for i = 1:no_twig
+    n_old   =   input('enter existing node number with whom new branch is added, n_old:');
+    n_new =   input('enter new bus number, n_new:');
+
+    if n_old == 0
+            % Modification - 1
+            Z_bus(n_new,n_new)  =   input(strcat('enter added line impedance z', int2str(n_new),int2str(n_new),': '));
+    else
+            % Modification - 2
+        for j = 1:no_twig
+            if j == n_new
+                % diagonal element
+                Z_bus(n_new,n_new)  =   Z_bus(n_old,n_old) + input(strcat('enter added line impedance z', int2str(n_old),int2str(n_new),': '));
+            else
+                % off-diagonal element
+                Z_bus(n_new,j)  =   Z_bus(n_old,j);
+                Z_bus(j,n_new)  =   Z_bus(j,n_old);
+            end
+        end
+    end
+end
+
+Z_old = Z_bus;
+
+% Z_bus modification for co-tree links
+for i = 1:no_Link
+    % provide bus information for link between p-q and branch impedance Zpq
+    disp('enter nodes p & q between which new link is added:');
+    p = input('p= ');
+    q = input('q= ');
+
+    Zpq     =   input(strcat('enter added line impedance z', int2str(p),int2str(q),': '));  %additional branch impedance
+
+    if p == 0 || q == 0
+        % Modification - 3
+        r   = p*(p~=0) + q*(q~=0);              % New branch between ref-0 and bus number 'r'
+        % denominator value for Modification - 3
+        denom   =   Zpq + Z_bus(r,r);
+        % Preperation of column and row matrices for modification-3
+        for k = 1:no_twig
+            Z_bus(N,k) = Z_bus(r,k);
+            Z_bus(k,N) = Z_bus(k,r);
+        end
+        % Change to be applied for each element of old Z_bus
+        del_Z   =   Z_bus(1:k,N)*Z_bus(N,1:k)/denom;
+
+        Z_new = Z_old - del_Z;          % New Z_bus matrix
+        Z_old = Z_new;                       % Saving New Z_bus as Old Z_bus matrix for next modication
+        Z_bus = Z_new;                  
+
+    else 
+        % Modification - 4
+        % denominator value for Modification - 4
+        denom   =   Zpq + Z_bus(p,p) + Z_bus(q,q) - 2*Z_bus(p,q);
+        % Preperation of column and row matrices for modification-4
+        for k = 1:no_twig
+            Z_bus(N,k) = Z_bus(q,k)-Z_bus(p,k);
+            Z_bus(k,N) = Z_bus(k,q)-Z_bus(k,p);
+        end
+        % Change to be applied for each element of old Z_bus
+        del_Z   =   Z_bus(1:k,N)*Z_bus(N,1:k)/denom;
+
+        Z_new = Z_old - del_Z;      % New Z_bus matrix
+        Z_old = Z_new;              % Storing New Z_bus as Old Z_bus for next modication
+        Z_bus = Z_new;              
+    end    
+end
+
+ disp('Bus Impedance Matrix Z_bus:')
+ disp(Z_bus)
